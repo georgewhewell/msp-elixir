@@ -9,14 +9,9 @@ defmodule MSP.Framing do
   @preamble_len     byte_size(@preamble_recv)
 
   use Bitwise
-
-  defmodule State do
-    defstruct [ buffer: <<>>, ]
-  end
-
-  def init(_args \\ []), do: {:ok, %State{}}
-  def frame_timeout(_state), do: {:ok, [], %State{}}
-  def flush(_direction, _state), do: %State{}
+  def init(_args \\ []), do: {:ok, <<>>}
+  def frame_timeout(_state), do: {:ok, [], <<>>}
+  def flush(_direction, _state), do: <<>>
 
   #   MSP frame
   #               |<---- C ---->|
@@ -36,7 +31,7 @@ defmodule MSP.Framing do
     payload = <<byte_size(message), type>> <> message
     {:ok, @preamble_send <> payload <> <<crc(payload)>>, _state}
   end
-  def add_framing(_, _state), do: {:error, <<>>, _state}
+  def add_framing(_, buffer), do: {:error, <<>>, buffer}
 
   # Checksum is recursive XOR of payload
   def crc(bin, acc \\ 0)
@@ -44,12 +39,11 @@ defmodule MSP.Framing do
   def crc(<<head, data::binary>>, acc), do: head ^^^ crc(data, acc)
 
   # Append new data to buffer and advance pointer, returning any new messages
-  def remove_framing(data, state) do
-    {new_buffer, lines} = process_data(state.buffer <> data, [])
+  def remove_framing(new_data, buffer) do
+    {new_buffer, lines} = process_data(buffer <> new_data, [])
     rc = if new_buffer == <<>>, do: :ok, else: :in_frame
     {lines, %State{buffer: new_buffer}}
   end
-  require Logger
 
   # Not enough data to begin detecting, skip
   defp process_data(buffer, lines) when byte_size(buffer) <= @preamble_len, do: {buffer, lines}

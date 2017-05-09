@@ -38,6 +38,14 @@ defmodule MSP.Framing do
   def crc(<<>>, acc), do: acc
   def crc(<<head, data::binary>>, acc), do: bxor(head, crc(data, acc))
 
+  # Return translated message or error
+  defp build_msg(type, data, check) do
+    case crc(<<byte_size(data)>> <> type <> data) do
+      ^check -> {type, data}
+      else_  -> {:echksum, {type, else_}}
+    end
+  end
+
   # Append new data to buffer and advance pointer, returning any new messages
   def remove_framing(new_data, buffer) do
     {msgs, buffer} = process_data([], buffer <> new_data)
@@ -52,16 +60,11 @@ defmodule MSP.Framing do
     case frame_data do
       # Full message (+rest)-
       << type   ::   binary-size(1),
-         msg    ::   binary-size(len),
+         data   ::   binary-size(len),
          check  ::   integer-size(8),
          rest   ::   binary  >> ->
-           case crc(<<len>> <> type <> msg) do
-             # Checksum matches, add to accumulator
-             ^check -> process_data(msgs ++ [type <> msg], rest)
-
-             # Checksum doesnt match, discard message
-             _else  -> process_data(msgs, rest)
-           end
+           new_msg = build_msg(type, data, check)
+           process_data(msgs ++ [new_msg], rest)
       # Not enough data, skip
       << _else::binary >> -> {msgs, buffer}
     end

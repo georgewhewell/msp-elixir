@@ -11,33 +11,32 @@ defmodule FramingTest do
 
   test "removes framing" do
     {:ok, buffer} = Framing.init()
-    assert {[<<0>>], ^buffer} = Framing.remove_framing(<<"$M>",0,0,0>>, buffer)
-    assert {[<<3,0,0,0>>], ^buffer} = Framing.remove_framing(<<"$M>",3,3,0,0,0,0>>, buffer)
-    assert {["ABC", "DEF"], ^buffer} = Framing.remove_framing(<<"$M>", 2, "ABCB$M>", 2, "DEFE">>, buffer)
+    assert {:ok, [{<<0>>, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,0,0>>, buffer)
+    assert {:ok, [{<<3>>, "666"}], ^buffer} = Framing.remove_framing(<<"$M>",3,3,54,54,54,54>>, buffer)
+    assert {:ok, [{<<0>>,"ABC"},{<<0>>,"DEF"}], ^buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABCC", "$M>", 3, 0, "DEFD">>, buffer)
   end
 
   test "handles partial lines" do
     {:ok, buffer} = Framing.init()
 
-    assert {[], buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABC">>, buffer)
-    assert {[<<0, "ABC">>], buffer} = Framing.remove_framing(<<"C">>, buffer)
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABC">>, buffer)
+    assert {:ok, [{<<0>>, "ABC"}], buffer} = Framing.remove_framing(<<"C">>, buffer)
 
-    assert {[], buffer} = Framing.remove_framing(<<"DEF$M>", 3, 0, "GHI">>, buffer)
-    assert {[<<0,"GHI">>], buffer} = Framing.remove_framing("E", buffer)
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"DEF$M>", 3, 0, "GHI">>, buffer)
+    assert {:ok, [{<<0>>,"GHI"}], buffer} = Framing.remove_framing("E", buffer)
 
     assert buffer == <<>>
   end
 
   test "checksum must be valid" do
     {:ok, buffer} = Framing.init()
-    assert {[], ^buffer} = Framing.remove_framing(<<"$M>",0,1,0>>, buffer)
-    assert {[<<1>>], ^buffer} = Framing.remove_framing(<<"$M>",0,1,1>>, buffer)
+    assert {:ok, [{:echksum, _}, {<<1>>, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,1,0,"$M>",0,1,1>>, buffer)
   end
 
   test "clears framing buffer on flush" do
     {:ok, buffer} = Framing.init()
 
-    assert {[], buffer} = Framing.remove_framing(<<"$M>", 4, "ABC">>, buffer)
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"$M>", 4, "ABC">>, buffer)
     assert buffer == <<"$M>",4,"ABC">>
 
     buffer = Framing.flush(:receive, buffer)
@@ -47,16 +46,16 @@ defmodule FramingTest do
   test "preamble fragmentation" do
     {:ok, buffer} = Framing.init()
 
-    assert {[], buffer} = Framing.remove_framing(<<"$">>, buffer)
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"$">>, buffer)
     assert buffer == "$"
 
-    assert {[], buffer} = Framing.remove_framing(<<"M">>, buffer)
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"M">>, buffer)
     assert buffer == "$M"
 
-    assert {[], buffer} = Framing.remove_framing(<<">">>, buffer)
+    assert {:ok, [], buffer} = Framing.remove_framing(<<">">>, buffer)
     assert buffer == "$M>"
 
-    assert {[<<0>>], buffer} = Framing.remove_framing(<<0,0,0>>, buffer)
+    assert {:ok, [{<<0>>, ""}], buffer} = Framing.remove_framing(<<0,0,0>>, buffer)
     assert buffer == <<>>
   end
 end

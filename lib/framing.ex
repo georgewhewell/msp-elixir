@@ -39,36 +39,32 @@ defmodule MSP.Framing do
   def crc(<<head, data::binary>>, acc), do: bxor(head, crc(data, acc))
 
   # Append new data to buffer and advance pointer, returning any new messages
-  def remove_framing(new_data, buffer) do
-    {new_buffer, lines} = process_data(buffer <> new_data, [])
-    rc = if new_buffer == <<>>, do: :ok, else: :in_frame
-    {lines, %State{buffer: new_buffer}}
-  end
+  def remove_framing(new_data, buffer), do: process_data([], buffer <> new_data)
 
   # Not enough data to begin detecting, skip
-  defp process_data(buffer, lines) when byte_size(buffer) <= @preamble_len, do: {buffer, lines}
+  defp process_data(msgs, buffer) when byte_size(buffer) <= @preamble_len, do: {msgs, buffer}
 
   # Header matches..
-  defp process_data(buffer = <<@preamble_recv, len::integer-size(8), rest::binary>>, lines) do
-    case rest do
-      # Full message (+rest)
+  defp process_data(msgs, buffer = <<@preamble_recv, len::integer-size(8), frame_data::binary>>) do
+    case frame_data do
+      # Full message (+rest)-
       << type   ::   binary-size(1),
          msg    ::   binary-size(len),
          check  ::   integer-size(8),
          rest   ::   binary  >> ->
            case crc(<<len>> <> type <> msg) do
              # Checksum matches, add to accumulator
-             ^check -> process_data(rest, lines ++ [type <> msg])
+             ^check -> process_data(msgs ++ [type <> msg], rest)
 
              # Checksum doesnt match, discard message
-             _else  -> process_data(rest, lines)
+             _else  -> process_data(msgs, rest)
            end
       # Not enough data, skip
-      << _else::binary >> -> {buffer, lines}
+      << _else::binary >> -> {msgs, buffer}
     end
   end
 
   # Header didnt match (but we have enough data for a frame), eat a character :)
-  defp process_data(<<_, rest::binary>>, lines), do: process_data(rest, lines)
+  defp process_data(msgs, <<_, rest::binary>>), do: process_data(msgs, rest)
 
 end

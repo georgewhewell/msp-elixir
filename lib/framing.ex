@@ -1,4 +1,5 @@
 defmodule MSP.Framing do
+  use Bitwise, skip_operators: true
   @behaviour Nerves.UART.Framing
 
   # detect start of MSP message
@@ -8,7 +9,6 @@ defmodule MSP.Framing do
   # for detector skip
   @preamble_len     byte_size(@preamble_recv)
 
-  use Bitwise
   def init(_args \\ []), do: {:ok, <<>>}
   def frame_timeout(_state), do: {:ok, [], <<>>}
   def flush(_direction, _state), do: <<>>
@@ -36,7 +36,7 @@ defmodule MSP.Framing do
   # Checksum is recursive XOR of payload
   def crc(bin, acc \\ 0)
   def crc(<<>>, acc), do: acc
-  def crc(<<head, data::binary>>, acc), do: head ^^^ crc(data, acc)
+  def crc(<<head, data::binary>>, acc), do: bxor(head, crc(data, acc))
 
   # Append new data to buffer and advance pointer, returning any new messages
   def remove_framing(new_data, buffer) do

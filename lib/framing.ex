@@ -39,7 +39,10 @@ defmodule MSP.Framing do
   def crc(<<head, data::binary>>, acc), do: bxor(head, crc(data, acc))
 
   # Append new data to buffer and advance pointer, returning any new messages
-  def remove_framing(new_data, buffer), do: process_data([], buffer <> new_data)
+  def remove_framing(new_data, buffer) do
+    {msgs, buffer} = process_data([], buffer <> new_data)
+    {:ok, msgs, buffer}
+  end
 
   # Not enough data to begin detecting, skip
   defp process_data(msgs, buffer) when byte_size(buffer) <= @preamble_len, do: {msgs, buffer}

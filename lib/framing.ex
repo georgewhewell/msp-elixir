@@ -1,4 +1,5 @@
 defmodule MSP.Framing do
+  alias MSP.Const
   use Bitwise, skip_operators: true
   @behaviour Nerves.UART.Framing
 
@@ -40,9 +41,9 @@ defmodule MSP.Framing do
 
   # Return translated message or error
   defp build_msg(type, data, check) do
-    case crc(<<byte_size(data)>> <> type <> data) do
-      ^check -> {type, data}
-      else_  -> {:echksum, {type, else_}}
+    case crc(<<byte_size(data), type>> <> data) do
+      ^check ->   Const.decode(type, data)
+      else_  -> {:echksum,  {type, else_}}
     end
   end
 
@@ -59,7 +60,7 @@ defmodule MSP.Framing do
   defp process_data(msgs, buffer = <<@preamble_recv, len::integer-size(8), frame_data::binary>>) do
     case frame_data do
       # Full message (+rest)-
-      << type   ::   binary-size(1),
+      << type   ::   integer-size(8),
          data   ::   binary-size(len),
          check  ::   integer-size(8),
          rest   ::   binary  >> ->

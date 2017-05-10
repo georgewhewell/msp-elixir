@@ -11,26 +11,26 @@ defmodule FramingTest do
 
   test "removes framing" do
     {:ok, buffer} = Framing.init()
-    assert {:ok, [{<<0>>, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,0,0>>, buffer)
-    assert {:ok, [{<<3>>, "666"}], ^buffer} = Framing.remove_framing(<<"$M>",3,3,54,54,54,54>>, buffer)
-    assert {:ok, [{<<0>>,"ABC"},{<<0>>,"DEF"}], ^buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABCC", "$M>", 3, 0, "DEFD">>, buffer)
+    assert {:ok, [{0, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,0,0>>, buffer)
+    assert {:ok, [{3, "666"}], ^buffer} = Framing.remove_framing(<<"$M>",3,3,54,54,54,54>>, buffer)
+    assert {:ok, [{0, "ABC"}, {0,"DEF"}], ^buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABCC", "$M>", 3, 0, "DEFD">>, buffer)
   end
 
   test "handles partial lines" do
     {:ok, buffer} = Framing.init()
 
     assert {:ok, [], buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABC">>, buffer)
-    assert {:ok, [{<<0>>, "ABC"}], buffer} = Framing.remove_framing(<<"C">>, buffer)
+    assert {:ok, [{0, "ABC"}], buffer} = Framing.remove_framing(<<"C">>, buffer)
 
     assert {:ok, [], buffer} = Framing.remove_framing(<<"DEF$M>", 3, 0, "GHI">>, buffer)
-    assert {:ok, [{<<0>>,"GHI"}], buffer} = Framing.remove_framing("E", buffer)
+    assert {:ok, [{0,"GHI"}], buffer} = Framing.remove_framing("E", buffer)
 
     assert buffer == <<>>
   end
 
   test "checksum must be valid" do
     {:ok, buffer} = Framing.init()
-    assert {:ok, [{:echksum, _}, {<<1>>, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,1,0,"$M>",0,1,1>>, buffer)
+    assert {:ok, [{:echksum, _}, {1, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,1,0,"$M>",0,1,1>>, buffer)
   end
 
   test "clears framing buffer on flush" do
@@ -55,7 +55,7 @@ defmodule FramingTest do
     assert {:ok, [], buffer} = Framing.remove_framing(<<">">>, buffer)
     assert buffer == "$M>"
 
-    assert {:ok, [{<<0>>, ""}], buffer} = Framing.remove_framing(<<0,0,0>>, buffer)
+    assert {:ok, [{0, ""}], buffer} = Framing.remove_framing(<<0,0,0>>, buffer)
     assert buffer == <<>>
   end
 end

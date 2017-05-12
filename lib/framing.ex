@@ -42,7 +42,7 @@ defmodule MSP.Framing do
   # Return translated message or error
   defp build_msg(type, data, check) do
     case crc(<<byte_size(data), type>> <> data) do
-      ^check ->   Const.decode(type, data)
+      ^check ->  Const.decode(type, data)
       else_  -> {:echksum,  {type, else_}}
     end
   end

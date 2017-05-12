@@ -58,4 +58,10 @@ defmodule FramingTest do
     assert {:ok, [{0, ""}], buffer} = Framing.remove_framing(<<0,0,0>>, buffer)
     assert buffer == <<>>
   end
+
+  test "can use tuple syntax" do
+    {:ok, buffer} = Framing.init()
+    assert {:ok, framedata, ^buffer} = Framing.add_framing(:msp_status, buffer)
+    assert {:ok, [{:msp_status, ""}], ^buffer} = Framing.remove_framing(framedata)
+  end
 end

@@ -1,4 +1,4 @@
-defmodule MSP do
+defmodule MSP.Client do
   @moduledoc """
   Documentation for MSP.
   """
@@ -10,11 +10,17 @@ defmodule MSP do
 
       iex> MSP.hello
       :world
-
+      msp_api_version: 1,
+      msp_fc_variant:  2,
+      msp_fc_version: 3,
+      msp_board_info: 4,
+      msp_build_info: 5,
   """
   defmodule State do
     defstruct [
       nerves_uart: nil,
+      connected: false,
+      identified: false,
     ]
   end
 
@@ -22,20 +28,28 @@ defmodule MSP do
   require Logger
   alias MSP.Const
 
-  def start_link(settings, opts \\ []) do
+  def start_link(port \\ "ttyACM0", opts \\ []) do
     Logger.debug "#{__MODULE__} Starting"
-    GenServer.start_link(__MODULE__, settings, opts)
+    GenServer.start_link(__MODULE__, port, opts)
   end
 
-  def init(settings) do
+  def init(port) do
     {:ok, pid} = Nerves.UART.start_link
-    :ok = Nerves.UART.open(pid, "ttyACM0", speed: 115200, active: true, framing: MSP.Framing)
+    :ok = Nerves.UART.open(pid, port, speed: 115200, active: true, framing: MSP.Framing)
+    send_request(pid, :msp_ident)
     send_request(pid, :msp_status)
     send_request(pid, :msp_status_ex)
+    send_request(pid, :msp_api_version)
+    send_request(pid, :msp_fc_variant)
+    send_request(pid, :msp_fc_version)
+    send_request(pid, :msp_fc_variant)
+    send_request(pid, :msp_board_info)
+    send_request(pid, :msp_build_info)
     {:ok, %State{nerves_uart: pid}}
   end
 
-  def encode(type, msg), do: <<Const.encode(type)>> <> msg
+  def encode(type, msg) when is_atom(type), do: <<Const.encode(type)>> <> msg
+  def encode(type, msg), do: type <> msg
   def send_request(pid, type, msg \\ <<>>), do: write(pid, encode(type, msg))
 
   def write(pid, data), do: Nerves.UART.write(pid, data)
@@ -44,32 +58,13 @@ defmodule MSP do
   def decode(_else), do: {:error, "Bad Message!"}
 
   def handle_info({:nerves_uart, "ttyACM0", {type, data}}, state) do
-    Logger.debug "Got data: #{inspect type}, state is #{inspect state}"
+    Logger.debug "Got data: #{inspect type}, data is #{inspect data}"
     case handle({type, data}, state) do
       {:ok, state} ->
         {:noreply, state}
       {:error, state} ->
         {:noreply, state}
     end
-  end
-
-  def handle(message, state)
-  def handle({:msp_status,
-    <<
-      cycleTime::     integer-size(16),
-      i2cErrorCount:: integer-size(16),
-      sensor::        integer-size(16),
-      flag::          binary-size(4),
-      currentSet::    integer-size(8),
-    >>}, state) do
-    Logger.debug "A message for me!"
-    Logger.debug "#{cycleTime} #{i2cErrorCount} #{sensor} #{flag} #{currentSet}"
-    {:ok, state}
-  end
-
-  def handle({:msp_status_ex, data}, state) do
-    Logger.debug "Extended status: #{inspect data}"
-    {:ok, state}
   end
 
   def handle({type, data}, state) do

@@ -11,4 +11,8 @@ defmodule MacroTest do
   test "binary syntax" do
     assert Patterns.binary(100, @simple) == quote do: <<100, version::unsigned-size(8)>>
   end
+
+  test "variable length" do
+    assert Patterns.binary(100, :binary) == quote do: <<100, data::binary>>
+  end
 end

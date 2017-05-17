@@ -19,6 +19,12 @@ defmodule MSP.Codec do
       {:hardware_revision, :unsigned, 16},
       {:board_type, :unsigned, 8},
     ]},
+    {5, :msp_build_info, [
+      {:build_date, :binary, 11},
+      {:build_time, :binary, 8},
+      {:git_revision, :binary, 7},
+    ]},
+    {10, :msp_name, :binary},
     {100, :msp_ident, [
       {:version, :unsigned, 8},
       {:multitype, :unsigned, 8},
@@ -48,6 +54,14 @@ defmodule MSP.Codec do
   ]
 
   defmodule Patterns do
+
+    # Handle single field, variable length response
+    def binary(code, :binary) do
+      {:<<>>, [], [code] ++ [{:::, [], [{:data, [], __MODULE__}, {:binary, [], __MODULE__}]}]}
+    end
+    def map(:binary), do: {:data, [], __MODULE__}
+
+    # Handle bit-packed data
     def binary(code, bits) do
       {:<<>>, [], [code] ++ Enum.map(bits, fn {name, type, length} ->
         {:::, [], [

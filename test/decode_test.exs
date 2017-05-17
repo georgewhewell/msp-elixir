@@ -22,5 +22,14 @@ defmodule DecodeTest do
       {:ok, {:msp_board_info, %{board_identifier: "SPEV", board_type: 0, hardware_revision: 0}}}
   end
 
+  test "msp_build_info" do
+    assert Codec.unpack(<<5, "Apr 22 2017", "14:55:51", "4328b13">>) == \
+      {:ok, {:msp_build_info, %{build_date: "Apr 22 2017", build_time: "14:55:51", git_revision: "4328b13"}}}
+  end
+
+  test "msp_name" do
+    assert Codec.unpack(<<10, "ABC">>) == \
+      {:ok, {:msp_name, "ABC"}}
+  end
 
 end

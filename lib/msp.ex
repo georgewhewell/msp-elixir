@@ -1,4 +1,5 @@
 defmodule MSP.Client do
+  alias MSP.Codec
   @moduledoc """
   Documentation for MSP.
   """
@@ -26,7 +27,6 @@ defmodule MSP.Client do
 
   use GenServer
   require Logger
-  alias MSP.Const
 
   def start_link(port \\ "ttyACM0", opts \\ []) do
     Logger.debug "#{__MODULE__} Starting"
@@ -37,29 +37,35 @@ defmodule MSP.Client do
     {:ok, pid} = Nerves.UART.start_link
     :ok = Nerves.UART.open(pid, port, speed: 115200, active: true, framing: MSP.Framing)
     send_request(pid, :msp_ident)
-    send_request(pid, :msp_status)
-    send_request(pid, :msp_status_ex)
     send_request(pid, :msp_api_version)
     send_request(pid, :msp_fc_variant)
     send_request(pid, :msp_fc_version)
-    send_request(pid, :msp_fc_variant)
     send_request(pid, :msp_board_info)
-    send_request(pid, :msp_build_info)
+    # send_request(pid, :msp_status_ex)
+    # send_request(pid, :msp_status)
+    # send_request(pid, :msp_status_ex)
+    # send_request(pid, :msp_api_version)
+    # send_request(pid, :msp_fc_variant)
+    # send_request(pid, :msp_fc_version)
+    # send_request(pid, :msp_fc_variant)
+    # send_request(pid, :msp_board_info)
+    # send_request(pid, :msp_build_info)
     {:ok, %State{nerves_uart: pid}}
   end
 
-  def encode(type, msg) when is_atom(type), do: <<Const.encode(type)>> <> msg
-  def encode(type, msg), do: type <> msg
-  def send_request(pid, type, msg \\ <<>>), do: write(pid, encode(type, msg))
+  # def encode(type, msg) when is_atom(type), do: <<Const.encode(type)>> <> msg
+  # def encode(type, msg), do: type <> msg
+  def send_request(pid, type, msg \\ %{}), do: write(pid, {type, msg})
 
-  def write(pid, data), do: Nerves.UART.write(pid, data)
+  def write(pid, {type, msg}), do: Nerves.UART.write(pid, Codec.pack(type, msg))
 
-  def decode(<<type::integer-size(8), message::binary>>), do: {:ok, {Const.decode(type), message}}
-  def decode(_else), do: {:error, "Bad Message!"}
+  # def decode(<<type::integer-size(8), message::binary>>), do: {:ok, {Const.decode(type), message}}
+  # def decode(_else), do: {:error, "Bad Message!"}
 
-  def handle_info({:nerves_uart, "ttyACM0", {type, data}}, state) do
-    Logger.debug "Got data: #{inspect type}, data is #{inspect data}"
-    case handle({type, data}, state) do
+  def handle_info({:nerves_uart, "ttyACM0", {:ok, data}}, state) do
+    {code, payload} = Codec.unpack(data)
+    Logger.debug "Got data: #{inspect code}, data is #{inspect payload}"
+    case handle({code, payload}, state) do
       {:ok, state} ->
         {:noreply, state}
       {:error, state} ->

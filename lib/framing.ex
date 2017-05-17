@@ -1,5 +1,6 @@
 defmodule MSP.Framing do
-  alias MSP.Const
+  alias MSP.Codec
+  require Logger
   use Bitwise, skip_operators: true
   @behaviour Nerves.UART.Framing
 
@@ -28,24 +29,25 @@ defmodule MSP.Framing do
   #
 
   # Add MSP frame to message
-  def add_framing(<<type::integer-size(8), message::binary>>, _state) do
-    payload = <<byte_size(message), type>> <> message
-    {:ok, @preamble_send <> payload <> <<crc(payload)>>, _state}
+  def add_framing(<<type::unsigned-size(8), data::binary>>, buffer) do
+    # data_size = byte_size(data) - 1
+    payload = <<byte_size(data), type>> <> data
+    {:ok, @preamble_send <> payload <> <<crc(payload)>>, buffer}
   end
   def add_framing(_, buffer), do: {:error, <<>>, buffer}
+
+  # Return translated message or error
+  defp build_msg(len, payload, check) do
+    case crc(<<len>> <> payload) do
+      ^check  ->   {:ok,       payload}
+      else_   ->   {:echksum,  payload}
+    end
+  end
 
   # Checksum is recursive XOR of payload
   def crc(bin, acc \\ 0)
   def crc(<<>>, acc), do: acc
   def crc(<<head, data::binary>>, acc), do: bxor(head, crc(data, acc))
-
-  # Return translated message or error
-  defp build_msg(type, data, check) do
-    case crc(<<byte_size(data), type>> <> data) do
-      ^check ->  Const.decode(type, data)
-      else_  -> {:echksum,  {type, else_}}
-    end
-  end
 
   # Append new data to buffer and advance pointer, returning any new messages
   def remove_framing(new_data, buffer) do
@@ -64,7 +66,7 @@ defmodule MSP.Framing do
          data   ::   binary-size(len),
          check  ::   integer-size(8),
          rest   ::   binary  >> ->
-           new_msg = build_msg(type, data, check)
+           new_msg = build_msg(len, <<type>> <> data, check)
            process_data(msgs ++ [new_msg], rest)
       # Not enough data, skip
       << _else::binary >> -> {msgs, buffer}
@@ -73,5 +75,4 @@ defmodule MSP.Framing do
 
   # Header didnt match (but we have enough data for a frame), eat a character :)
   defp process_data(msgs, <<_, rest::binary>>), do: process_data(msgs, rest)
-
 end

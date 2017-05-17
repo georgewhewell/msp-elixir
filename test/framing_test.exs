@@ -2,6 +2,12 @@ defmodule FramingTest do
   use ExUnit.Case
   alias MSP.Framing
 
+  test "crc" do
+    assert Framing.crc(<<0>>) == 0
+    assert Framing.crc(<<0,0,0,0>>) == 0
+    assert Framing.crc(<<1,1,1,0>>) == 1
+  end
+
   test "adds framing" do
       {:ok, buffer} = Framing.init()
       assert {:error, <<>>, ^buffer} = Framing.add_framing("", buffer)
@@ -11,26 +17,44 @@ defmodule FramingTest do
 
   test "removes framing" do
     {:ok, buffer} = Framing.init()
-    assert {:ok, [{0, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,0,0>>, buffer)
-    assert {:ok, [{3, "666"}], ^buffer} = Framing.remove_framing(<<"$M>",3,3,54,54,54,54>>, buffer)
-    assert {:ok, [{0, "ABC"}, {0,"DEF"}], ^buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABCC", "$M>", 3, 0, "DEFD">>, buffer)
-  end
-
-  test "handles partial lines" do
-    {:ok, buffer} = Framing.init()
-
-    assert {:ok, [], buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABC">>, buffer)
-    assert {:ok, [{0, "ABC"}], buffer} = Framing.remove_framing(<<"C">>, buffer)
-
-    assert {:ok, [], buffer} = Framing.remove_framing(<<"DEF$M>", 3, 0, "GHI">>, buffer)
-    assert {:ok, [{0,"GHI"}], buffer} = Framing.remove_framing("E", buffer)
-
-    assert buffer == <<>>
+    assert {:ok, [{:ok, <<0>>}], ^buffer} = Framing.remove_framing(<<"$M>",0,0,0>>, buffer)
+    assert {:ok, [{:ok, <<3,"666">>}], ^buffer} = Framing.remove_framing(<<"$M>",3,3,54,54,54,54>>, buffer)
+    assert {:ok, [{:ok, <<0,"ABC">>}, {:ok,<<0,"DEF">>}], ^buffer} = Framing.remove_framing(<<"$M>", 3, 0, "ABCC", "$M>", 3, 0, "DEFD">>, buffer)
   end
 
   test "checksum must be valid" do
     {:ok, buffer} = Framing.init()
-    assert {:ok, [{:echksum, _}, {1, ""}], ^buffer} = Framing.remove_framing(<<"$M>",0,1,0,"$M>",0,1,1>>, buffer)
+    assert {:ok, [{:echksum, _}, {:ok, <<1>>}], ^buffer} = Framing.remove_framing(<<"$M>",0,1,0,"$M>",0,1,1>>, buffer)
+  end
+
+  test "handles partial lines" do
+    {:ok, buffer} = Framing.init()
+    assert {:ok, [], buffer = <<"$M>", 3, 0, "ABC">>} = Framing.remove_framing(<<"$M>", 3, 0, "ABC">>, buffer)
+    assert {:ok, [{:ok, <<0, "ABC">>}], buffer} = Framing.remove_framing(<<"C">>, buffer)
+    assert buffer = <<>>
+  end
+
+  test "discards leading junk" do
+    {:ok, buffer} = Framing.init()
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"zzz$M>", 3, 0, "GHI">>, buffer)
+    assert {:ok, [{:ok,<<0, "GHI">>}], buffer} = Framing.remove_framing("E", buffer)
+  end
+
+
+  test "handles preamble fragmentation" do
+    {:ok, buffer} = Framing.init()
+
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"$">>, buffer)
+    assert buffer == "$"
+
+    assert {:ok, [], buffer} = Framing.remove_framing(<<"M">>, buffer)
+    assert buffer == "$M"
+
+    assert {:ok, [], buffer} = Framing.remove_framing(<<">">>, buffer)
+    assert buffer == "$M>"
+
+    assert {:ok, [{:ok, <<0>>}], buffer} = Framing.remove_framing(<<0,0,0>>, buffer)
+    assert buffer == <<>>
   end
 
   test "clears framing buffer on flush" do
@@ -43,25 +67,4 @@ defmodule FramingTest do
     assert buffer == <<>>
   end
 
-  test "preamble fragmentation" do
-    {:ok, buffer} = Framing.init()
-
-    assert {:ok, [], buffer} = Framing.remove_framing(<<"$">>, buffer)
-    assert buffer == "$"
-
-    assert {:ok, [], buffer} = Framing.remove_framing(<<"M">>, buffer)
-    assert buffer == "$M"
-
-    assert {:ok, [], buffer} = Framing.remove_framing(<<">">>, buffer)
-    assert buffer == "$M>"
-
-    assert {:ok, [{0, ""}], buffer} = Framing.remove_framing(<<0,0,0>>, buffer)
-    assert buffer == <<>>
-  end
-
-  test "can use tuple syntax" do
-    {:ok, buffer} = Framing.init()
-    assert {:ok, framedata, ^buffer} = Framing.add_framing(:msp_status, buffer)
-    assert {:ok, [{:msp_status, ""}], ^buffer} = Framing.remove_framing(framedata)
-  end
 end

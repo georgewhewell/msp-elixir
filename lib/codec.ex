@@ -70,7 +70,10 @@ defmodule MSP.Codec do
   for {code, cmd, bits} <- commands do
     def unpack(binary)
     def unpack(unquote(Patterns.binary(code, bits))) do
-      {unquote(cmd), unquote(Patterns.map(bits))}
+      {:ok, {unquote(cmd), unquote(Patterns.map(bits))}}
+    end
+    def unpack(<<unquote(code), rest::binary>>) do
+      {:error, {unquote(cmd), rest}}
     end
 
     def pack(unquote(cmd), unquote(Patterns.map(bits))) do

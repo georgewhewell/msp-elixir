@@ -1,3 +1,2 @@
-%{"crc": {:hex, :crc, "0.5.2", "6db0c06f4bb2ae6a737a32b31fd40842774d4aae903b76e5f4dae44bd4b2742c", [:make, :mix], []},
-  "elixir_make": {:hex, :elixir_make, "0.4.0", "992f38fabe705bb45821a728f20914c554b276838433349d4f2341f7a687cddf", [:mix], []},
+%{"elixir_make": {:hex, :elixir_make, "0.4.0", "992f38fabe705bb45821a728f20914c554b276838433349d4f2341f7a687cddf", [:mix], []},
   "nerves_uart": {:hex, :nerves_uart, "0.1.2", "4310dbb1721a5a007b8e5c416cf81754415bde6b7e2c9aa65a059886b85e637c", [:make, :mix], [{:elixir_make, "~> 0.4", [hex: :elixir_make, optional: false]}]}}
